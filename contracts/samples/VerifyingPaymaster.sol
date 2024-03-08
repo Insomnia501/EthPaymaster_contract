@@ -103,7 +103,6 @@ contract VerifyingPaymaster is BasePaymaster {
      * it is called on-chain from the validatePaymasterUserOp, to validate the signature.
      * note that this signature covers all fields of the UserOperation, except the "paymasterAndData",
      * which will carry the signature itself.
-     * 把userOp和paymaster侧的一些参数以及表示有效期的两个参数，一起hash起来
      */
     function getHash(
         UserOperation calldata userOp,

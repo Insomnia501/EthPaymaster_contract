@@ -365,4 +365,12 @@ contract PaymasterV1 is BasePaymaster {
             return  _ERC20PostOp(mode, context, actualGasCost);
         }
     }
+
+    function _validatePaymasterUserOpCall(UserOperation calldata userOp,
+        bytes32 /*userOpHash*/,
+        uint256 requiredPreFund) 
+    external returns (bytes memory context, uint256 validationData) {
+        //bytes32 userOphash = new bytes32("0x");
+        return _validatePaymasterUserOp(userOp, bytes32(0), requiredPreFund);
+    }
 }

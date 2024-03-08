@@ -7,7 +7,7 @@
 import { ethers } from "hardhat";
 
 const network_configs = {
-    mumbai: {
+    mumbai:{
         _matic_usd_aggregator: "0xd0D5e3DB44DE05E9F294BB0a3bEEaF030DE24Ada",
         _usdc_usd_aggregator: "0x572dDec9087154dC5dfBB1546Bb62713147e0Ab0",
         _usdc_address: "0x9999f7Fea5938fD3b1E26A12c3f2fb024e194f97"
@@ -50,8 +50,8 @@ async function deployContract(name:string, contractName:string, constructorParam
     console.log("[%s] ConstructorArguments: %s", name, constructorParams);
     const factory = await ethers.getContractFactory(contractName);
     const contract = await factory.deploy(...constructorParams);
-    await contract.waitForDeployment();
-    const address = await contract.getAddress();
+    await contract.deployed();
+    const address = await contract.address;
     await verifyOnBlockscan(address, constructorParams);
     console.log("[%s] Contract address: %s", name, address);
     return address;
