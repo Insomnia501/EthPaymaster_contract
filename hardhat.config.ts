@@ -2,10 +2,11 @@ import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
 import "dotenv/config";
 import "@nomiclabs/hardhat-ethers";
+import "module-alias/register";
 
-const { ProxyAgent, setGlobalDispatcher } = require("undici");
-const proxyAgent = new ProxyAgent("http://127.0.0.1:7890");
-setGlobalDispatcher(proxyAgent);
+//const { ProxyAgent, setGlobalDispatcher } = require("undici");
+//const proxyAgent = new ProxyAgent("http://127.0.0.1:7890");
+//setGlobalDispatcher(proxyAgent);
 
 const withOptimizations = true;
 const defaultNetwork = "hardhat"; // "hardhat" for tests
@@ -14,7 +15,7 @@ const config: HardhatUserConfig = {
   solidity: {
     compilers: [    //可指定多个sol版本
       {
-        version: "0.8.24",
+        version: "0.8.23",
         settings: {
           optimizer: {
             enabled: withOptimizations,
