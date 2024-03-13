@@ -4,7 +4,8 @@
 // When running the script with `npx hardhat run <script>` you'll find the Hardhat
 // Runtime Environment's members available in the global scope.
 
-import { ethers } from "hardhat";
+import {ethers} from "hardhat";
+
 
 const network_configs = {
     mumbai:{
@@ -27,24 +28,24 @@ async function main() {
 
     //let config = network_configs[network];
 
-    let [addr] = await ethers.getSigners();
-    let signer = await addr.getAddress();// "0x31ca0eecbCF9442e0f9A00ae66aea3622119ccf1";
+    let [addr] = await ethers.getSigners()
+    let signer = await addr.getAddress()
 
     console.log("Deploy contract EOA address: " + signer);
 
-    //const [entryPoint, entryPointAddress] = await deployContract("EntryPoint", "EntryPoint", []);
-    const entryPoint = "0xc0c4568957ff6b6ed0793ecd861534342551890c";
+    const entryPointAddress = await deployContract("EntryPoint", "EntryPoint", []);
+    //const entryPointAddress = "0xc0c4568957ff6b6ed0793ecd861534342551890c";
     //const ERC20PaymasterAddress = await deployContract("ERC20Paymaster", "ERC20Paymaster",
     //    [config._usdc_address, entryPointAddress, config._usdc_usd_aggregator, config._eth_usd_aggregator, addr.address]);
-    //const [verifyingPaymaster, verifyingPaymasterAddress] = await deployContract("VerifyingPaymaster", "VerifyingPaymaster",[entryPoint, signer]);
-    const [PaymasterV1, PaymasterV1Address] = await deployContract("PaymasterV1", "PaymasterV1",[entryPoint, signer]);
+    //const verifyingPaymasterAddress = await deployContract("VerifyingPaymaster", "VerifyingPaymaster",[entryPoint, signer]);
+    const paymasterV1Address = await deployContract("PaymasterV1", "PaymasterV1",[entryPointAddress, signer]);
     
 
     console.log("------------ RESULT ---------------")
-    //console.log("[ContractAddress] EntryPointAddress: %s", entryPointAddress);
+    console.log("[ContractAddress] EntryPointAddress: %s", entryPointAddress);
     //console.log("[ContractAddress] VerifyingPaymasterAddress: %s", verifyingPaymasterAddress);
     //console.log("[ContractAddress] ERC20PaymasterAddress: %s", ERC20PaymasterAddress);
-    console.log("[ContractAddress] PaymasterV1Address: %s", PaymasterV1Address);
+    console.log("[ContractAddress] PaymasterV1Address: %s", paymasterV1Address);
     console.log("------------ RESULT ---------------")
 
     console.log("[Success] All contracts have been deployed success.")
@@ -61,7 +62,7 @@ async function deployContract(name:string, contractName:string, constructorParam
     console.log("deploy done.")
     await verifyOnBlockscan(address, constructorParams);
     console.log("[%s] Contract address: %s", name, address);
-    return [contract, address];
+    return address;
 }
 
 async function verifyOnBlockscan(address:string, args:any[]) {

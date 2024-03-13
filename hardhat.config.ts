@@ -1,8 +1,11 @@
 import { HardhatUserConfig } from "hardhat/config";
-import "@nomicfoundation/hardhat-toolbox";
 import "dotenv/config";
 import "@nomiclabs/hardhat-ethers";
-import "module-alias/register";
+//import "module-alias/register";
+import "@nomiclabs/hardhat-etherscan";
+import '@nomiclabs/hardhat-waffle'
+import '@typechain/hardhat'
+import 'hardhat-deploy'
 
 //const { ProxyAgent, setGlobalDispatcher } = require("undici");
 //const proxyAgent = new ProxyAgent("http://127.0.0.1:7890");
@@ -41,7 +44,7 @@ const config: HardhatUserConfig = {
     }
 },
 etherscan: {
-    apiKey: process.env.SCAN_API_KEY
+    apiKey: process.env.POLYGONSCAN_API_KEY
 },
 };
 
