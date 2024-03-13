@@ -323,8 +323,8 @@ export function packPaymasterData (paymaster: string, paymasterVerificationGasLi
 
 export function packPaymasterData2 (typeId:string, paymaster: string, paymasterVerificationGasLimit: BytesLike | Hexable | number | bigint, postOpGasLimit: BytesLike | Hexable | number | bigint, paymasterData: string): string {
   return ethers.utils.hexConcat([
-    typeId, paymaster, hexZeroPad(hexlify(paymasterVerificationGasLimit, { hexPad: 'left' }), 16),
-    hexZeroPad(hexlify(postOpGasLimit, { hexPad: 'left' }), 16), paymasterData
+    paymaster, hexZeroPad(hexlify(paymasterVerificationGasLimit, { hexPad: 'left' }), 16),
+    hexZeroPad(hexlify(postOpGasLimit, { hexPad: 'left' }), 16),  typeId, paymasterData
   ])
 }
 
