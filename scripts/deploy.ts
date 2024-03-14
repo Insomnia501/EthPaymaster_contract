@@ -26,26 +26,31 @@ async function main() {
     const network = hre.network.name;
     console.log("Network:", network, "configs:", network_configs[network]);
 
-    //let config = network_configs[network];
+    let config = network_configs[network];
 
     let [addr] = await ethers.getSigners()
     let signer = await addr.getAddress()
 
     console.log("Deploy contract EOA address: " + signer);
 
-    const entryPointAddress = await deployContract("EntryPoint", "EntryPoint", []);
-    //const entryPointAddress = "0xc0c4568957ff6b6ed0793ecd861534342551890c";
+    //const entryPointAddress = await deployContract("EntryPoint", "EntryPoint", []);
+    const entryPointAddress = "0xa5d3e13f26d16a4af2aeb9f5b6f6a2b7029321fd";
+
     //const ERC20PaymasterAddress = await deployContract("ERC20Paymaster", "ERC20Paymaster",
     //    [config._usdc_address, entryPointAddress, config._usdc_usd_aggregator, config._eth_usd_aggregator, addr.address]);
-    //const verifyingPaymasterAddress = await deployContract("VerifyingPaymaster", "VerifyingPaymaster",[entryPoint, signer]);
-    const paymasterV1Address = await deployContract("PaymasterV1", "PaymasterV1",[entryPointAddress, signer]);
+    
+    //const verifyingPaymasterAddress = await deployContract("PaymasterV0_1", "PaymasterV0_1",[entryPointAddress, signer]);
+    
+    const paymasterV1_1Address = await deployContract("PaymasterV1_1", "PaymasterV1_1",
+    [entryPointAddress, signer, config._usdc_address, config._usdc_usd_aggregator, config._eth_usd_aggregator,signer]);
     
 
     console.log("------------ RESULT ---------------")
     console.log("[ContractAddress] EntryPointAddress: %s", entryPointAddress);
     //console.log("[ContractAddress] VerifyingPaymasterAddress: %s", verifyingPaymasterAddress);
     //console.log("[ContractAddress] ERC20PaymasterAddress: %s", ERC20PaymasterAddress);
-    console.log("[ContractAddress] PaymasterV1Address: %s", paymasterV1Address);
+    //console.log("[ContractAddress] PaymasterV1Address: %s", paymasterV1Address);
+    console.log("[ContractAddress] PaymasterV1_1Address: %s", paymasterV1_1Address);
     console.log("------------ RESULT ---------------")
 
     console.log("[Success] All contracts have been deployed success.")
@@ -60,7 +65,7 @@ async function deployContract(name:string, contractName:string, constructorParam
     await contract.deployed();
     const address = await contract.address;
     console.log("deploy done.")
-    await verifyOnBlockscan(address, constructorParams);
+    //await verifyOnBlockscan(address, constructorParams);
     console.log("[%s] Contract address: %s", name, address);
     return address;
 }
