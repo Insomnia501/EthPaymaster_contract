@@ -12,8 +12,8 @@ import {
   EntryPoint
 } from '../typechain'
 import { ethers } from 'hardhat'
-import { createAddress, deployEntryPoint, fund, ONE_ETH } from './testutils'
-import { DefaultsForUserOp, fillAndPack, packUserOp, simulateValidation } from './UserOp'
+import { createAddress, deployEntryPoint, fund, ONE_ETH, simulationResultWithAggregationCatch } from './testutils'
+import { DefaultsForUserOp, fillUserOp } from './UserOp'
 import { expect } from 'chai'
 import { keccak256 } from 'ethereumjs-util'
 import { hashToPoint } from '@thehubbleproject/bls/dist/mcl'
@@ -44,9 +44,9 @@ describe('bls account', function () {
     const BLSOpenLib = await new BLSOpen__factory(ethers.provider.getSigner()).deploy()
     blsAgg = await new BLSSignatureAggregator__factory({
       'contracts/samples/bls/lib/BLSOpen.sol:BLSOpen': BLSOpenLib.address
-    }, ethers.provider.getSigner()).deploy(entrypoint.address)
+    }, ethers.provider.getSigner()).deploy()
 
-    await blsAgg.addStake(2, { value: ONE_ETH })
+    await blsAgg.addStake(entrypoint.address, 2, { value: ONE_ETH })
     fact = await BlsSignerFactory.new()
     signer1 = fact.getSigner(arrayify(BLS_DOMAIN), '0x01')
     signer2 = fact.getSigner(arrayify(BLS_DOMAIN), '0x02')
@@ -66,14 +66,14 @@ describe('bls account', function () {
     const sig1 = signer1.sign('0x1234')
     const sig2 = signer2.sign('0x5678')
     const offChainSigResult = hexConcat(aggregate([sig1, sig2]))
-    const userOp1 = packUserOp({ ...DefaultsForUserOp, signature: hexConcat(sig1) })
-    const userOp2 = packUserOp({ ...DefaultsForUserOp, signature: hexConcat(sig2) })
+    const userOp1 = { ...DefaultsForUserOp, signature: hexConcat(sig1) }
+    const userOp2 = { ...DefaultsForUserOp, signature: hexConcat(sig2) }
     const solidityAggResult = await blsAgg.aggregateSignatures([userOp1, userOp2])
     expect(solidityAggResult).to.equal(offChainSigResult)
   })
 
   it('#userOpToMessage', async () => {
-    const userOp1 = await fillAndPack({
+    const userOp1 = await fillUserOp({
       sender: account1.address
     }, entrypoint)
     const requestHash = await blsAgg.getUserOpHash(userOp1)
@@ -83,7 +83,7 @@ describe('bls account', function () {
   })
 
   it('#validateUserOpSignature', async () => {
-    const userOp1 = await fillAndPack({
+    const userOp1 = await fillUserOp({
       sender: account1.address
     }, entrypoint)
     const requestHash = await blsAgg.getUserOpHash(userOp1)
@@ -108,7 +108,7 @@ describe('bls account', function () {
     const res = await brokenAccountFactory.provider.call(deployTx)
     const acc = brokenAccountFactory.interface.decodeFunctionResult('createAccount', res)[0]
     await fund(acc)
-    const userOp = await fillAndPack({
+    const userOp = await fillUserOp({
       sender: acc,
       initCode: hexConcat([brokenAccountFactory.address, deployTx.data!])
     }, entrypoint)
@@ -135,14 +135,14 @@ describe('bls account', function () {
   it('validateSignatures', async function () {
     // yes, it does take long on hardhat, but quick on geth.
     this.timeout(30000)
-    const userOp1 = await fillAndPack({
+    const userOp1 = await fillUserOp({
       sender: account1.address
     }, entrypoint)
     const requestHash = await blsAgg.getUserOpHash(userOp1)
     const sig1 = signer1.sign(requestHash)
     userOp1.signature = hexConcat(sig1)
 
-    const userOp2 = await fillAndPack({
+    const userOp2 = await fillUserOp({
       sender: account2.address
     }, entrypoint)
     const requestHash2 = await blsAgg.getUserOpHash(userOp2)
@@ -182,7 +182,7 @@ describe('bls account', function () {
       const verifier = new BlsVerifier(BLS_DOMAIN)
       const senderAddress = await entrypoint.callStatic.getSenderAddress(initCode).catch(e => e.errorArgs.sender)
       await fund(senderAddress, '0.01')
-      const userOp = await fillAndPack({
+      const userOp = await fillUserOp({
         sender: senderAddress,
         initCode
       }, entrypoint)
@@ -190,7 +190,7 @@ describe('bls account', function () {
       const sigParts = signer3.sign(requestHash)
       userOp.signature = hexConcat(sigParts)
 
-      const { aggregatorInfo } = await simulateValidation(userOp, entrypoint.address)
+      const { aggregatorInfo } = await entrypoint.callStatic.simulateValidation(userOp).catch(simulationResultWithAggregationCatch)
       expect(aggregatorInfo.aggregator).to.eq(blsAgg.address)
       expect(aggregatorInfo.stakeInfo.stake).to.eq(ONE_ETH)
       expect(aggregatorInfo.stakeInfo.unstakeDelaySec).to.eq(2)

@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.12;
+pragma solidity ^0.8.23;
 
 /* solhint-disable reason-string */
 /* solhint-disable no-inline-assembly */
 
 import "../lib/account-abstraction/contracts/core/BasePaymaster.sol";
+import "../lib/account-abstraction/contracts/interfaces/UserOperation.sol";
+import "../lib/account-abstraction/contracts/core/Helpers.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+
 /**
  * A sample paymaster that uses external service to decide whether to pay for the UserOp.
  * The paymaster trusts an external signer to sign the transaction.
@@ -15,18 +18,23 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
  * - the paymaster checks a signature to agree to PAY for GAS.
  * - the account checks a signature to prove identity and account ownership.
  */
-contract VerifyingPaymaster is BasePaymaster {
+contract PaymasterV0_1 is BasePaymaster {
 
     using ECDSA for bytes32;
     using UserOperationLib for UserOperation;
 
     address public immutable verifyingSigner;
 
-    uint256 private constant VALID_TIMESTAMP_OFFSET = 20;
+    uint256 private constant TYPE_OFFSET = 20;
+    uint256 private constant VALID_TIMESTAMP_OFFSET = 21;
 
-    uint256 private constant SIGNATURE_OFFSET = 84;
+    uint256 private constant SIGNATURE_OFFSET = 85;
 
-    constructor(IEntryPoint _entryPoint, address _verifyingSigner) BasePaymaster(_entryPoint) {
+
+    constructor(
+        IEntryPoint _entryPoint, 
+        address _verifyingSigner
+    ) BasePaymaster(_entryPoint) {
         verifyingSigner = _verifyingSigner;
     }
 
@@ -69,15 +77,15 @@ contract VerifyingPaymaster is BasePaymaster {
             ));
     }
 
-    /**
+/**
      * verify our external signer signed this request.
      * the "paymasterAndData" is expected to be the paymaster and a signature over the entire request params
      * paymasterAndData[:20] : address(this)
      * paymasterAndData[20:84] : abi.encode(validUntil, validAfter)
      * paymasterAndData[84:] : signature
      */
-    function _validatePaymasterUserOp(UserOperation calldata userOp, bytes32 /*userOpHash*/, uint256 requiredPreFund)
-    internal override returns (bytes memory context, uint256 validationData) {
+    function _verifyingPaymasterUserOp(UserOperation calldata userOp, uint256 requiredPreFund)
+    internal returns (bytes memory context, uint256 validationData) {
         (requiredPreFund);
 
         (uint48 validUntil, uint48 validAfter, bytes calldata signature) = parsePaymasterAndData(userOp.paymasterAndData);
@@ -89,16 +97,40 @@ contract VerifyingPaymaster is BasePaymaster {
 
         //don't revert on signature failure: return SIG_VALIDATION_FAILED
         if (verifyingSigner != ECDSA.recover(hash, signature)) {
-            return ("",_packValidationData(true,validUntil,validAfter));
+            return ("0x00",_packValidationData(true,validUntil,validAfter));
         }
 
         //no need for other on-chain validation: entire UserOp should have been checked
         // by the external service prior to signing it.
-        return ("",_packValidationData(false,validUntil,validAfter));
+        return ("0x00",_packValidationData(false,validUntil,validAfter));
     }
 
     function parsePaymasterAndData(bytes calldata paymasterAndData) public pure returns(uint48 validUntil, uint48 validAfter, bytes calldata signature) {
         (validUntil, validAfter) = abi.decode(paymasterAndData[VALID_TIMESTAMP_OFFSET:SIGNATURE_OFFSET],(uint48, uint48));
         signature = paymasterAndData[SIGNATURE_OFFSET:];
+    }
+
+    function _validatePaymasterUserOp(UserOperation calldata userOp, bytes32 /*userOpHash*/, uint256 requiredPreFund)
+    internal override returns (bytes memory context, uint256 validationData) {
+        uint8 typeId = uint8(bytes1(userOp.paymasterAndData[TYPE_OFFSET: VALID_TIMESTAMP_OFFSET]));
+        require(typeId < 2, "PaymasterV1: invalid mode.");
+        if (typeId == 0) {
+            return  _verifyingPaymasterUserOp(userOp, requiredPreFund);
+        }
+        else if (typeId == 1) {
+            return  _verifyingPaymasterUserOp(userOp, requiredPreFund);
+        }
+    }
+    
+    function _postOp(PostOpMode mode, bytes calldata context, uint256 actualGasCost) internal override 
+    {
+        uint8 typeId= uint8(bytes1(context[:1]));
+        require(typeId < 2, "PaymasterV1: invalid mode.");
+        if (typeId == 0) {
+            return  super._postOp(mode, context, actualGasCost);
+        }
+        else if (typeId == 1) {
+            return  super._postOp(mode, context, actualGasCost);
+        }
     }
 }

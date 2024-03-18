@@ -1,10 +1,7 @@
 import { ethers } from 'hardhat'
 import {
   arrayify,
-  hexConcat, hexDataSlice,
-  hexlify,
-  hexZeroPad,
-  Interface,
+  hexConcat,
   keccak256,
   parseEther
 } from 'ethers/lib/utils'
@@ -13,18 +10,16 @@ import {
   EntryPoint,
   EntryPoint__factory,
   IERC20,
+  IEntryPoint,
   SimpleAccount,
   SimpleAccountFactory__factory,
-  SimpleAccount__factory,
-  SimpleAccountFactory,
-  TestAggregatedAccountFactory, TestPaymasterRevertCustomError__factory, TestERC20__factory
+  SimpleAccount__factory, SimpleAccountFactory, TestAggregatedAccountFactory
 } from '../lib/account-abstraction/typechain'
-import { BytesLike, Hexable } from '@ethersproject/bytes'
+import { BytesLike } from '@ethersproject/bytes'
 import { expect } from 'chai'
 import { Create2Factory } from '../lib/account-abstraction/src/Create2Factory'
 import { debugTransaction } from './debugTx'
 import { UserOperation } from './UserOperation'
-import { packUserOp, simulateValidation } from './UserOp'
 
 export const AddressZero = ethers.constants.AddressZero
 export const HashZero = ethers.constants.HashZero
@@ -160,51 +155,26 @@ export function rethrow (): (e: Error) => void {
   }
 }
 
-const decodeRevertReasonContracts = new Interface([
-  ...EntryPoint__factory.createInterface().fragments,
-  ...TestPaymasterRevertCustomError__factory.createInterface().fragments,
-  ...TestERC20__factory.createInterface().fragments, // for OZ errors,
-  'error ECDSAInvalidSignature()'
-]) // .filter(f => f.type === 'error'))
-
-export function decodeRevertReason (data: string | Error, nullIfNoMatch = true): string | null {
-  if (typeof data !== 'string') {
-    const err = data as any
-    data = (err.data ?? err.error?.data) as string
-    if (typeof data !== 'string') throw err
-  }
-
+export function decodeRevertReason (data: string, nullIfNoMatch = true): string | null {
   const methodSig = data.slice(0, 10)
   const dataParams = '0x' + data.slice(10)
 
-  // can't add Error(string) to xface...
   if (methodSig === '0x08c379a0') {
     const [err] = ethers.utils.defaultAbiCoder.decode(['string'], dataParams)
     // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
     return `Error(${err})`
+  } else if (methodSig === '0x00fa072b') {
+    const [opindex, paymaster, msg] = ethers.utils.defaultAbiCoder.decode(['uint256', 'address', 'string'], dataParams)
+    // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+    return `FailedOp(${opindex}, ${paymaster !== AddressZero ? paymaster : 'none'}, ${msg})`
   } else if (methodSig === '0x4e487b71') {
     const [code] = ethers.utils.defaultAbiCoder.decode(['uint256'], dataParams)
     return `Panic(${panicCodes[code] ?? code} + ')`
   }
-
-  try {
-    const err = decodeRevertReasonContracts.parseError(data)
-    // treat any error "bytes" argument as possible error to decode (e.g. FailedOpWithRevert, PostOpReverted)
-    const args = err.args.map((arg: any, index) => {
-      switch (err.errorFragment.inputs[index].type) {
-        case 'bytes' : return decodeRevertReason(arg)
-        case 'string': return `"${(arg as string)}"`
-        default: return arg
-      }
-    })
-    return `${err.name}(${args.join(',')})`
-  } catch (e) {
-    // throw new Error('unsupported errorSig ' + data)
-    if (!nullIfNoMatch) {
-      return data
-    }
-    return null
+  if (!nullIfNoMatch) {
+    return data
   }
+  return null
 }
 
 let currentNode: string = ''
@@ -236,14 +206,12 @@ export async function checkForGeth (): Promise<void> {
 // becomes:
 // { first: "a", second: "20" }
 export function objdump (obj: { [key: string]: any }): any {
-  return obj == null
-    ? null
-    : Object.keys(obj)
-      .filter(key => key.match(/^[\d_]/) == null)
-      .reduce((set, key) => ({
-        ...set,
-        [key]: decodeRevertReason(obj[key].toString(), false)
-      }), {})
+  return Object.keys(obj)
+    .filter(key => key.match(/^[\d_]/) == null)
+    .reduce((set, key) => ({
+      ...set,
+      [key]: decodeRevertReason(obj[key].toString(), false)
+    }), {})
 }
 
 export async function checkForBannedOps (txHash: string, checkPaymaster: boolean): Promise<void> {
@@ -273,15 +241,47 @@ export async function checkForBannedOps (txHash: string, checkPaymaster: boolean
   }
 }
 
+/**
+ * process exception of ValidationResult
+ * usage: entryPoint.simulationResult(..).catch(simulationResultCatch)
+ */
+export function simulationResultCatch (e: any): any {
+  if (e.errorName !== 'ValidationResult') {
+    throw e
+  }
+  return e.errorArgs
+}
+
+/**
+ * process exception of ValidationResultWithAggregation
+ * usage: entryPoint.simulationResult(..).catch(simulationResultWithAggregation)
+ */
+export function simulationResultWithAggregationCatch (e: any): any {
+  if (e.errorName !== 'ValidationResultWithAggregation') {
+    throw e
+  }
+  return e.errorArgs
+}
+
 export async function deployEntryPoint (provider = ethers.provider): Promise<EntryPoint> {
   const create2factory = new Create2Factory(provider)
-  const addr = await create2factory.deploy(EntryPoint__factory.bytecode, process.env.SALT, process.env.COVERAGE != null ? 20e6 : 8e6)
+  const epf = new EntryPoint__factory(provider.getSigner())
+  const addr = await create2factory.deploy(epf.bytecode, 0, process.env.COVERAGE != null ? 20e6 : 8e6)
   return EntryPoint__factory.connect(addr, provider.getSigner())
 }
 
 export async function isDeployed (addr: string): Promise<boolean> {
   const code = await ethers.provider.getCode(addr)
   return code.length > 2
+}
+
+// internal helper function: create a UserOpsPerAggregator structure, with no aggregator or signature
+export function userOpsWithoutAgg (userOps: UserOperation[]): IEntryPoint.UserOpsPerAggregatorStruct[] {
+  return [{
+    userOps,
+    aggregator: AddressZero,
+    signature: '0x'
+  }]
 }
 
 // Deploys an implementation and a proxy pointing to this implementation
@@ -306,141 +306,4 @@ export async function createAccount (
     accountFactory,
     proxy
   }
-}
-
-export function packAccountGasLimits (verificationGasLimit: BigNumberish, callGasLimit: BigNumberish): string {
-  return ethers.utils.hexConcat([
-    hexZeroPad(hexlify(verificationGasLimit, { hexPad: 'left' }), 16), hexZeroPad(hexlify(callGasLimit, { hexPad: 'left' }), 16)
-  ])
-}
-
-export function packPaymasterData (paymaster: string, paymasterVerificationGasLimit: BytesLike | Hexable | number | bigint, postOpGasLimit: BytesLike | Hexable | number | bigint, paymasterData: string): string {
-  return ethers.utils.hexConcat([
-    paymaster, hexZeroPad(hexlify(paymasterVerificationGasLimit, { hexPad: 'left' }), 16),
-    hexZeroPad(hexlify(postOpGasLimit, { hexPad: 'left' }), 16), paymasterData
-  ])
-}
-
-export function packPaymasterData2 (typeId:string, paymaster: string, paymasterVerificationGasLimit: BytesLike | Hexable | number | bigint, postOpGasLimit: BytesLike | Hexable | number | bigint, paymasterData: string): string {
-  return ethers.utils.hexConcat([
-    paymaster, hexZeroPad(hexlify(paymasterVerificationGasLimit, { hexPad: 'left' }), 16),
-    hexZeroPad(hexlify(postOpGasLimit, { hexPad: 'left' }), 16),  typeId, paymasterData
-  ])
-}
-
-export function unpackAccountGasLimits (accountGasLimits: string): { verificationGasLimit: number, callGasLimit: number } {
-  return { verificationGasLimit: parseInt(accountGasLimits.slice(2, 34), 16), callGasLimit: parseInt(accountGasLimits.slice(34), 16) }
-}
-
-export interface ValidationData {
-  aggregator: string
-  validAfter: number
-  validUntil: number
-}
-
-export const maxUint48 = (2 ** 48) - 1
-export function parseValidationData (validationData: BigNumberish): ValidationData {
-  const data = hexZeroPad(BigNumber.from(validationData).toHexString(), 32)
-
-  // string offsets start from left (msb)
-  const aggregator = hexDataSlice(data, 32 - 20)
-  let validUntil = parseInt(hexDataSlice(data, 32 - 26, 32 - 20))
-  if (validUntil === 0) {
-    validUntil = maxUint48
-  }
-  const validAfter = parseInt(hexDataSlice(data, 0, 6))
-
-  return {
-    aggregator,
-    validAfter,
-    validUntil
-  }
-}
-
-export function packValidationData (validationData: ValidationData): BigNumber {
-  return BigNumber.from(validationData.validAfter).shl(48)
-    .add(validationData.validUntil).shl(160)
-    .add(validationData.aggregator)
-}
-
-// find the lowest number in the range min..max where testFunc returns true
-export async function findMin (testFunc: (index: number) => Promise<boolean>, min: number, max: number, delta = 5): Promise<number> {
-  if (await testFunc(min)) {
-    throw new Error(`increase range: function already true at ${min}`)
-  }
-  if (!await testFunc(max)) {
-    throw new Error(`no result: function is false for max value in ${min}..${max}`)
-  }
-  while (true) {
-    const avg = Math.floor((max + min) / 2)
-    if (await testFunc(avg)) {
-      max = avg
-    } else {
-      min = avg
-    }
-    // console.log('== ', min, '...', max, max - min)
-    if (Math.abs(max - min) < delta) {
-      return max
-    }
-  }
-}
-
-/**
- * find the lowest value that when creating a userop, still doesn't revert and
- * doesn't emit UserOperationPrefundTooLow
- * note: using eth_snapshot/eth_revert, since we actually submit calls to handleOps
- * @param f function that return a signed userop, with parameter-under-test set to "n"
- * @param min range minimum. the function is expected to return false
- * @param max range maximum. the function is expected to be true
- * @param entryPoint entrypoint for "fillAndSign" of userops
- */
-export async function findUserOpWithMin (f: (n: number) => Promise<UserOperation>, expectExec: boolean, entryPoint: EntryPoint, min: number, max: number, delta = 2): Promise<number> {
-  const beneficiary = ethers.provider.getSigner().getAddress()
-  return await findMin(
-    async n => {
-      const snapshot = await ethers.provider.send('evm_snapshot', [])
-      try {
-        const userOp = await f(n)
-        // console.log('== userop=', userOp)
-        const rcpt = await entryPoint.handleOps([packUserOp(userOp)], beneficiary, { gasLimit: 1e6 })
-          .then(async r => r.wait())
-        if (rcpt?.events?.find(e => e.event === 'UserOperationPrefundTooLow') != null) {
-          // console.log('min', n, 'UserOperationPrefundTooLow')
-          return false
-        }
-        if (expectExec) {
-          const useropEvent = rcpt?.events?.find(e => e.event === 'UserOperationEvent')
-          if (useropEvent?.args?.success !== true) {
-            // console.log(rcpt?.events?.map((e: any) => ({ ev: e.event, ...objdump(e.args!) })))
-
-            // console.log('min', n, 'success=false')
-            return false
-          }
-        }
-        // console.log('min', n, 'ok')
-        return true
-      } catch (e) {
-        // console.log('min', n, 'ex=', decodeRevertReason(e as Error))
-        return false
-      } finally {
-        await ethers.provider.send('evm_revert', [snapshot])
-      }
-    }, min, max, delta
-  )
-}
-
-export async function findSimulationUserOpWithMin (f: (n: number) => Promise<UserOperation>, entryPoint: EntryPoint, min: number, max: number, delta = 2): Promise<number> {
-  return await findMin(
-    async n => {
-      try {
-        const userOp = await f(n)
-        await simulateValidation(packUserOp(userOp), entryPoint.address)
-        // console.log('sim', n, 'ok')
-        return true
-      } catch (e) {
-        // console.log('sim', n, 'ex=', decodeRevertReason(e as Error))
-        return false
-      }
-    }, min, max, delta
-  )
 }
