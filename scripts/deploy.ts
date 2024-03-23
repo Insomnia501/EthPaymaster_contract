@@ -32,26 +32,18 @@ async function main() {
     let signer = await addr.getAddress()
 
     console.log("Deploy contract EOA address: " + signer);
-
-    //const entryPointAddress = await deployContract("EntryPoint", "EntryPoint", []);
     const entryPointAddress = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789";
 
     const testAddress = "0x0E1375d18a4A2A867bEfe908E87322ad031386a6"
 
-    //const ERC20PaymasterAddress = await deployContract("ERC20Paymaster", "ERC20Paymaster",
-    //    [config._usdc_address, entryPointAddress, config._usdc_usd_aggregator, config._eth_usd_aggregator, addr.address]);
-    
-    //const verifyingPaymasterAddress = await deployContract("PaymasterV0_1", "PaymasterV0_1",[entryPointAddress, signer]);
+    //const verifyingPaymasterAddress = await deployContract("VerifyingPaymaster", "VerifyingPaymaster",[entryPointAddress, testAddress]);
     
     const paymasterV1_1Address = await deployContract("PaymasterV1_1", "PaymasterV1_1",
     [entryPointAddress, testAddress, config._usdc_address, config._usdc_usd_aggregator, config._eth_usd_aggregator,signer]);
-    
 
     console.log("------------ RESULT ---------------")
     console.log("[ContractAddress] EntryPointAddress: %s", entryPointAddress);
     //console.log("[ContractAddress] VerifyingPaymasterAddress: %s", verifyingPaymasterAddress);
-    //console.log("[ContractAddress] ERC20PaymasterAddress: %s", ERC20PaymasterAddress);
-    //console.log("[ContractAddress] PaymasterV1Address: %s", paymasterV1Address);
     console.log("[ContractAddress] PaymasterV1_1Address: %s", paymasterV1_1Address);
     console.log("------------ RESULT ---------------")
 
@@ -67,7 +59,7 @@ async function deployContract(name:string, contractName:string, constructorParam
     await contract.deployed();
     const address = await contract.address;
     console.log("deploy done.")
-    //await verifyOnBlockscan(address, constructorParams);
+    await verifyOnBlockscan(address, constructorParams);
     console.log("[%s] Contract address: %s", name, address);
     return address;
 }

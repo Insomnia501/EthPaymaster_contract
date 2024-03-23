@@ -111,7 +111,32 @@ contract PaymasterV1_1 is BasePaymaster {
             ));
     }
 
-/**
+    function getHashTest(UserOperation calldata userOp, uint48 validUntil, uint48 validAfter)
+    public view returns (uint256, bytes memory, bytes memory, bytes32) {
+        //can't use userOp.hash(), since it contains also the paymasterAndData itself.
+
+        return (
+            senderNonce[userOp.getSender()],
+            pack(userOp), 
+            abi.encode(
+                pack(userOp),
+                block.chainid,
+                address(this),
+                senderNonce[userOp.getSender()],
+                validUntil,
+                validAfter
+            ),
+            keccak256(abi.encode(
+                pack(userOp),
+                block.chainid,
+                address(this),
+                senderNonce[userOp.getSender()],
+                validUntil,
+                validAfter
+            )));
+    }
+
+    /**
      * verify our external signer signed this request.
      * the "paymasterAndData" is expected to be the paymaster and a signature over the entire request params
      * paymasterAndData[:20] : address(this)

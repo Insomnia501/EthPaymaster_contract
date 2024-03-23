@@ -7,9 +7,9 @@ import '@nomiclabs/hardhat-waffle'
 import '@typechain/hardhat'
 import 'hardhat-deploy'
 
-//const { ProxyAgent, setGlobalDispatcher } = require("undici");
-//const proxyAgent = new ProxyAgent("http://127.0.0.1:7890");
-//setGlobalDispatcher(proxyAgent);
+import { ProxyAgent, setGlobalDispatcher } from "undici";
+const proxyAgent = new ProxyAgent("http://127.0.0.1:7890");
+setGlobalDispatcher(proxyAgent);
 
 const withOptimizations = true;
 const defaultNetwork = "hardhat"; // "hardhat" for tests
