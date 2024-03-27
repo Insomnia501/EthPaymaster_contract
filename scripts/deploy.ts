@@ -8,42 +8,40 @@ import {ethers} from "hardhat";
 
 
 const network_configs = {
-    mumbai:{
-        _matic_usd_aggregator: "0xd0D5e3DB44DE05E9F294BB0a3bEEaF030DE24Ada",
-        _usdc_usd_aggregator: "0x572dDec9087154dC5dfBB1546Bb62713147e0Ab0",
-        _usdc_address: "0x9999f7Fea5938fD3b1E26A12c3f2fb024e194f97"
-    }, ethereum: {}, polygon: {},
     sepolia: {
         _eth_usd_aggregator: "0x694AA1769357215DE4FAC081bf1f309aDC325306",
         _usdc_usd_aggregator: "0xA2F78ab2355fe2f984D808B5CeE7FD0A93D5270E",
         _usdc_address: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"
+    },
+    mumbai:{
+        _matic_usd_aggregator: "0xd0D5e3DB44DE05E9F294BB0a3bEEaF030DE24Ada",
+        _usdc_usd_aggregator: "0x572dDec9087154dC5dfBB1546Bb62713147e0Ab0",
+        _usdc_address: "0x9999f7Fea5938fD3b1E26A12c3f2fb024e194f97"
     },
 }
 
 
 
 async function main() {
+
+    const entryPointAddress = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789";
+    const testAddress = "0x0E1375d18a4A2A867bEfe908E87322ad031386a6"
+
     const network = hre.network.name;
     console.log("Network:", network, "configs:", network_configs[network]);
-
     let config = network_configs[network];
 
     let [addr] = await ethers.getSigners()
     let signer = await addr.getAddress()
-
     console.log("Deploy contract EOA address: " + signer);
-    const entryPointAddress = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789";
 
-    const testAddress = "0x0E1375d18a4A2A867bEfe908E87322ad031386a6"
-
-    //const verifyingPaymasterAddress = await deployContract("VerifyingPaymaster", "VerifyingPaymaster",[entryPointAddress, testAddress]);
-    
+    const verifyingPaymasterAddress = await deployContract("VerifyingPaymaster", "VerifyingPaymaster",[entryPointAddress, testAddress]);
     const paymasterV1_1Address = await deployContract("PaymasterV1_1", "PaymasterV1_1",
     [entryPointAddress, testAddress, config._usdc_address, config._usdc_usd_aggregator, config._eth_usd_aggregator,signer]);
 
     console.log("------------ RESULT ---------------")
     console.log("[ContractAddress] EntryPointAddress: %s", entryPointAddress);
-    //console.log("[ContractAddress] VerifyingPaymasterAddress: %s", verifyingPaymasterAddress);
+    console.log("[ContractAddress] VerifyingPaymasterAddress: %s", verifyingPaymasterAddress);
     console.log("[ContractAddress] PaymasterV1_1Address: %s", paymasterV1_1Address);
     console.log("------------ RESULT ---------------")
 

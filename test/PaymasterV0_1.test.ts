@@ -55,32 +55,6 @@ describe('EntryPoint with VerifyingPaymaster', function () {
     })
   })
 
-  describe('#getHash', () => {
-    it('should get hash properly', async () => {
-      const userOp:UserOperation = {
-        callData: "0xb61d27f60000000000000000000000001c7d4b196cb0c7b01d743fbc6116a902379c7238000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044095ea7b30000000000000000000000000000000000325602a77416a16136fdafd04b299fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000",
-        callGasLimit: "0x54fa",
-        initCode: "0x9406cc6185a346906296840746125a0e449764545fbfb9cf000000000000000000000000340966abb6e37a06014546e0542b3aafad4550810000000000000000000000000000000000000000000000000000000000000000",
-        maxFeePerGas: "0x2aa887baca",
-        maxPriorityFeePerGas: "0x59682f00",
-        nonce: "0x00",
-        preVerificationGas: "0xae64",
-        sender: "0xF8498599744BC37e141cb800B67Dbf103a6b5881",
-        signature: "0xfffffffffffffffffffffffffffffff0000000000000000000000000000000007aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1c",
-        verificationGasLimit: "0x05fa35",
-        paymasterAndData: "0xE99c4Db5E360B8c84bF3660393CB2A85c3029b4400000000000000000000000000000000000000000000000000000000171004449600000000000000000000000000000000000000000000000000000017415804969e46721fc1938ac427add8a9e0d5cba2be5b17ccda9b300d0d3eeaff1904dfc23e276abd1ba6e3e269ec6aa36fe6a2442c18d167b53d7f9f0d1b3ebe80b09a6200"
-      }
-      const validUntil = "0x001710044496";
-      const validAfter = "0x001741580496";
-      const TRUE_SIG = "0x9e46721fc1938ac427add8a9e0d5cba2be5b17ccda9b300d0d3eeaff1904dfc23e276abd1ba6e3e269ec6aa36fe6a2442c18d167b53d7f9f0d1b3ebe80b09a6200"
-      //const paymasterAndData = hexConcat(['0x00', paymaster.address, defaultAbiCoder.encode(['uint48', 'uint48'], [MOCK_VALID_UNTIL, MOCK_VALID_AFTER]), MOCK_SIG])
-      //console.log(paymasterAndData)
-      const res = await paymaster.getHash(userOp, validUntil, validAfter)
-      console.log(res)
-      expect(res).equal(TRUE_SIG)
-    })
-  })
-
   describe('#validatePaymasterUserOp', () => {
     it('should reject on no signature', async () => {
       const userOp = await fillAndSign({

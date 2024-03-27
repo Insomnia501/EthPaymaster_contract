@@ -13,6 +13,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import "./utils/IOracle.sol";
 import "./utils/SafeTransferLib.sol";
+
 /**
  * A sample paymaster that uses external service to decide whether to pay for the UserOp.
  * The paymaster trusts an external signer to sign the transaction.
@@ -102,38 +103,13 @@ contract PaymasterV1_1 is BasePaymaster {
         //can't use userOp.hash(), since it contains also the paymasterAndData itself.
 
         return keccak256(abi.encode(
-                pack(userOp),
-                block.chainid,
-                address(this),
-                senderNonce[userOp.getSender()],
-                validUntil,
-                validAfter
-            ));
-    }
-
-    function getHashTest(UserOperation calldata userOp, uint48 validUntil, uint48 validAfter)
-    public view returns (uint256, bytes memory, bytes memory, bytes32) {
-        //can't use userOp.hash(), since it contains also the paymasterAndData itself.
-
-        return (
+            pack(userOp),
+            block.chainid,
+            address(this),
             senderNonce[userOp.getSender()],
-            pack(userOp), 
-            abi.encode(
-                pack(userOp),
-                block.chainid,
-                address(this),
-                senderNonce[userOp.getSender()],
-                validUntil,
-                validAfter
-            ),
-            keccak256(abi.encode(
-                pack(userOp),
-                block.chainid,
-                address(this),
-                senderNonce[userOp.getSender()],
-                validUntil,
-                validAfter
-            )));
+            validUntil,
+            validAfter
+        ));
     }
 
     /**
@@ -289,6 +265,12 @@ contract PaymasterV1_1 is BasePaymaster {
         price = uint192(int192(answer));
     }
 
+    /// @notice Switch the validatePaymasterUserOp mode by typeId
+    /// @dev This function is used to switch the correct pay type and exec validation of user op
+    /// @param userOp The user operation data.
+    /// @param requiredPreFund The amount of tokens required for pre-funding.
+    /// @return context The context containing the token amount and user sender address (if applicable).
+    /// @return validationResult A uint256 value indicating the result of the validation (always 0 in this implementation).
     function _validatePaymasterUserOp(UserOperation calldata userOp, bytes32 /*userOpHash*/, uint256 requiredPreFund)
     internal override returns (bytes memory context, uint256 validationData) {
         uint8 typeId = uint8(bytes1(userOp.paymasterAndData[TYPE_OFFSET: VALID_TIMESTAMP_OFFSET]));
@@ -301,6 +283,11 @@ contract PaymasterV1_1 is BasePaymaster {
         }
     }
     
+    /// @notice Switch the correct post op logic by typeId
+    /// @dev This function is called after a user operation has been executed or reverted.
+    /// @param mode The post-operation mode (either successful or reverted).
+    /// @param context The context containing the token amount and user sender address.
+    /// @param actualGasCost The actual gas cost of the transaction.
     function _postOp(PostOpMode mode, bytes calldata context, uint256 actualGasCost) internal override 
     {
         uint8 typeId= uint8(bytes1(context[:1]));

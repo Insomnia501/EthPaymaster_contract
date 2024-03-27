@@ -77,7 +77,7 @@ contract PaymasterV0_1 is BasePaymaster {
             ));
     }
 
-/**
+    /**
      * verify our external signer signed this request.
      * the "paymasterAndData" is expected to be the paymaster and a signature over the entire request params
      * paymasterAndData[:20] : address(this)
