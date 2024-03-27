@@ -12,7 +12,6 @@ Phase 1: Basic Paymaster
 
 ```shell
 cd lib/account-abstraction
-git checkout releases/v0.6
 yarn
 yarn hardhat compile
 ```
